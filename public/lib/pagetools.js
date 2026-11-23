@@ -1,5 +1,5 @@
 // Browser-only helpers: run cleanup on images, make print-sharp versions, PDFs.
-import { cleanPixels, toBinary, toRGBA } from './cleanup.js';
+import { cleanPixels, toBinary, toRGBA, weightOptions } from './cleanup.js';
 import { makePdf } from './pdf.js';
 
 const toBlob = (c, type, q) => new Promise(res => c.toBlob(res, type, q));
@@ -16,9 +16,9 @@ async function pixelsOf(blob) {
 }
 
 // Original AI picture -> clean pure black-and-white PNG.
-export async function cleanBlob(original, thickness = 0) {
+export async function cleanBlob(original, weight = 4) {
   const { c, ctx, data } = await pixelsOf(original);
-  const rgba = cleanPixels(data.data, c.width, c.height, { thickness });
+  const rgba = cleanPixels(data.data, c.width, c.height, weightOptions(weight));
   ctx.putImageData(new ImageData(rgba, c.width, c.height), 0, 0);
   return toBlob(c, 'image/png');
 }

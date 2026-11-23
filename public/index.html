@@ -51,6 +51,9 @@
     <div id="result" class="result" hidden>
       <img id="resultImg" alt="Your coloring page">
       <p id="resultInfo" class="info"></p>
+      <label id="weightLabel" for="weight">Line weight: 4 (Normal)</label>
+      <input id="weight" type="range" min="1" max="9" step="1" value="4">
+      <div class="range-ends"><span>Thinnest</span><span>Thickest</span></div>
       <div class="row">
         <button id="thinner" class="big">Thinner lines</button>
         <button id="thicker" class="big">Thicker lines</button>
@@ -82,6 +85,9 @@
     <div id="viewer" class="viewer" hidden>
       <img id="viewerImg" alt="Saved coloring page">
       <p id="viewerInfo" class="info"></p>
+      <label id="vWeightLabel" for="vWeight">Line weight: 4 (Normal)</label>
+      <input id="vWeight" type="range" min="1" max="9" step="1" value="4">
+      <div class="range-ends"><span>Thinnest</span><span>Thickest</span></div>
       <div class="row wrap">
         <button id="vFav" class="big">☆ Favorite</button>
         <button id="vThinner" class="big">Thinner lines</button>

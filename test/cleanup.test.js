@@ -67,3 +67,44 @@ test('default cleanup keeps two close lines apart (no blobs)', () => {
   const out = cleanPixels(rgba(vals), w, h);
   assert.equal(out[(2 * w + 4) * 4], 255);
 });
+
+import { WEIGHTS, clampWeight, weightOf, weightOptions, DEFAULT_WEIGHT } from '../public/lib/cleanup.js';
+import fs from 'node:fs';
+
+test('line weight has 9 steps, 4 is normal', () => {
+  assert.equal(Object.keys(WEIGHTS).length, 9);
+  assert.equal(DEFAULT_WEIGHT, 4);
+  assert.equal(WEIGHTS[4].label, 'Normal');
+  assert.equal(clampWeight(0), 1);
+  assert.equal(clampWeight(12), 9);
+  assert.equal(clampWeight('x'), 4);
+  assert.deepEqual(weightOptions(4), { threshold: 155, thickness: 0 });
+});
+
+test('thinning never erodes (fine lines are not erased)', () => {
+  for (let w = 1; w <= 9; w++) assert.ok(weightOptions(w).thickness >= 0);
+});
+
+test('old pages with thinner/thicker settings map onto the slider', () => {
+  assert.equal(weightOf({ thickness: -1 }), 2);
+  assert.equal(weightOf({ thickness: 0 }), 4);
+  assert.equal(weightOf({ thickness: 1 }), 8);
+  assert.equal(weightOf({ thickness: 2 }), 9);
+  assert.equal(weightOf({}), 4);
+  assert.equal(weightOf({ weight: 6 }), 6);
+});
+
+test('each slider step makes lines darker in small steps', () => {
+  // Thin soft lines (like AI line art): a dark core with gray edges, every 6 px.
+  const w = 240, h = 8, px = [];
+  const ramp = [255, 230, 150, 40, 150, 230];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.push(ramp[x % 6]);
+  const rgba = Uint8ClampedArray.from(px.flatMap(v => [v, v, v, 255]));
+  let prev = -1;
+  for (let lv = 1; lv <= 9; lv++) {
+    const out = cleanPixels(rgba, w, h, { ...weightOptions(lv), speckSize: 1 });
+    let black = 0; for (let i = 0; i < out.length; i += 4) if (out[i] === 0) black++;
+    assert.ok(black >= prev, `step ${lv}`);
+    prev = black;
+  }
+});

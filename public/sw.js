@@ -1,5 +1,5 @@
 // Keeps the app working when the connection is weak. AI requests always go online.
-const CACHE = 'cbs-v2';
+const CACHE = 'cbs-v3';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'lib/core.js', 'lib/db.js', 'lib/cleanup.js', 'lib/pdf.js', 'lib/pagetools.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', e => {

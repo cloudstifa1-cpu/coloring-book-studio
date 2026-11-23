@@ -110,3 +110,35 @@ export function cleanPixels(rgba, w, h, opts = {}) {
   bin = adjustThickness(bin, w, h, o.thickness);
   return toRGBA(bin);
 }
+
+// Line weight slider, 1 (thinnest) to 9 (thickest). 4 = normal.
+// Low/mid steps change how dark a gray must be to become a line (gentle);
+// top steps also grow the lines. Thinning never erodes, so fine lines aren't erased.
+export const WEIGHTS = {
+  1: { threshold: 95, thickness: 0, label: 'Thinnest' },
+  2: { threshold: 115, thickness: 0, label: 'Very thin' },
+  3: { threshold: 135, thickness: 0, label: 'Thin' },
+  4: { threshold: 155, thickness: 0, label: 'Normal' },
+  5: { threshold: 180, thickness: 0, label: 'A bit bolder' },
+  6: { threshold: 205, thickness: 0, label: 'Bolder' },
+  7: { threshold: 228, thickness: 0, label: 'Thick' },
+  8: { threshold: 125, thickness: 1, label: 'Very thick' },
+  9: { threshold: 160, thickness: 1, label: 'Thickest' },
+};
+export const DEFAULT_WEIGHT = 4;
+
+export function clampWeight(w) {
+  const n = Math.round(Number(w));
+  return Number.isFinite(n) ? Math.min(9, Math.max(1, n)) : DEFAULT_WEIGHT;
+}
+
+// Pages saved before the slider used thickness -1..2.
+export function weightOf(page) {
+  if (page && page.weight) return clampWeight(page.weight);
+  return { '-1': 2, 0: 4, 1: 8, 2: 9 }[page && page.thickness || 0] || DEFAULT_WEIGHT;
+}
+
+export function weightOptions(level) {
+  const { threshold, thickness } = WEIGHTS[clampWeight(level)];
+  return { threshold, thickness };
+}

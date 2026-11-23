@@ -1,5 +1,6 @@
 import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
 import { cleanBlob, sharpPng, pagePdf, saveFile } from './lib/pagetools.js';
+import { WEIGHTS, DEFAULT_WEIGHT, clampWeight, weightOf } from './lib/cleanup.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -66,8 +67,7 @@ function showImage(img, blob) {
 }
 
 function infoText(p) {
-  const lines = ['Thinner', 'Normal', 'Thicker', 'Extra thick'][(p.thickness || 0) + 1];
-  return `${p.subject} — Difficulty ${p.difficulty} — Lines: ${lines}`;
+  return `${p.subject} — Difficulty ${p.difficulty} — Lines: ${WEIGHTS[weightOf(p)].label}`;
 }
 
 // ---------- Make a Page ----------
@@ -112,11 +112,11 @@ async function makeOne(subject, difficulty) {
     throw new Error(msg);
   }
   const original = await r.blob();
-  const blob = await cleanBlob(original, 0);
+  const blob = await cleanBlob(original, DEFAULT_WEIGHT);
   const page = {
     id: makeId(), created: Date.now(), subject, theme: selectedTheme, difficulty,
     seed: Number(r.headers.get('x-seed')) || 0, source: r.headers.get('x-source') || 'cloudflare',
-    favorite: false, original, blob, thickness: 0, thumb: await makeThumb(blob),
+    favorite: false, original, blob, weight: DEFAULT_WEIGHT, thumb: await makeThumb(blob),
   };
   await savePage(db, page);
   bumpLocalCount();
@@ -125,6 +125,8 @@ async function makeOne(subject, difficulty) {
 
 function showResult(page) {
   current = page;
+  $('weight').value = weightOf(page);
+  $('weightLabel').textContent = weightLabel(weightOf(page));
   showImage($('resultImg'), page.blob);
   $('resultInfo').textContent = infoText(page);
   $('result').hidden = false;
@@ -185,19 +187,25 @@ async function runBatch() {
   }
 }
 
-async function setThickness(page, t, img, info) {
+// Line weight: re-cleans from the original AI picture, so nothing is lost by changing it.
+async function setWeight(page, level, img, info, slider) {
   if (!page || busy) return;
+  const w = clampWeight(level);
+  slider.value = w;
+  slider.previousElementSibling.textContent = weightLabel(w);
   setBusy(true);
   try {
-    page.thickness = Math.max(-1, Math.min(2, t));
+    page.weight = w;
     page.original = page.original || page.blob;
-    page.blob = await cleanBlob(page.original, page.thickness);
+    page.blob = await cleanBlob(page.original, w);
     page.thumb = await makeThumb(page.blob);
     await savePage(db, page);
     showImage(img, page.blob);
     info.textContent = infoText(page);
   } finally { setBusy(false); }
 }
+
+function weightLabel(w) { return `Line weight: ${w} (${WEIGHTS[w].label})`; }
 
 async function download(page, kind) {
   if (!page) return;
@@ -250,6 +258,8 @@ async function openViewer(id) {
   viewing = await getPage(db, id);
   if (!viewing) return;
   showImage($('viewerImg'), viewing.blob);
+  $('vWeight').value = weightOf(viewing);
+  $('vWeightLabel').textContent = weightLabel(weightOf(viewing));
   $('viewerInfo').textContent = infoText(viewing);
   $('vFav').textContent = viewing.favorite ? '★ Favorited' : '☆ Favorite';
   $('viewer').hidden = false;
@@ -281,10 +291,17 @@ async function start() {
   $('downloadPng').onclick = () => download(current, 'png');
   $('downloadPrint').onclick = () => download(current, 'print');
   $('downloadPdf').onclick = () => download(current, 'pdf');
-  $('thinner').onclick = () => current && setThickness(current, current.thickness - 1, $('resultImg'), $('resultInfo'));
-  $('thicker').onclick = () => current && setThickness(current, current.thickness + 1, $('resultImg'), $('resultInfo'));
-  $('vThinner').onclick = () => viewing && setThickness(viewing, (viewing.thickness || 0) - 1, $('viewerImg'), $('viewerInfo'));
-  $('vThicker').onclick = () => viewing && setThickness(viewing, (viewing.thickness || 0) + 1, $('viewerImg'), $('viewerInfo'));
+  const R = [$('resultImg'), $('resultInfo'), $('weight')];
+  const V = [$('viewerImg'), $('viewerInfo'), $('vWeight')];
+  $('thinner').onclick = () => current && setWeight(current, weightOf(current) - 1, ...R);
+  $('thicker').onclick = () => current && setWeight(current, weightOf(current) + 1, ...R);
+  $('vThinner').onclick = () => viewing && setWeight(viewing, weightOf(viewing) - 1, ...V);
+  $('vThicker').onclick = () => viewing && setWeight(viewing, weightOf(viewing) + 1, ...V);
+  // Label moves while sliding; the page is re-cleaned when you let go.
+  for (const [sl, lab, get, set] of [[$('weight'), $('weightLabel'), () => current, R], [$('vWeight'), $('vWeightLabel'), () => viewing, V]]) {
+    sl.oninput = () => { lab.textContent = weightLabel(clampWeight(sl.value)); };
+    sl.onchange = () => get() && setWeight(get(), sl.value, ...set);
+  }
   $('vPrint').onclick = () => download(viewing, 'print');
   $('vPdf').onclick = () => download(viewing, 'pdf');
   $('batch').onclick = runBatch;
