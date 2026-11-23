@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0b12">
+<title>Coloring Book Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>Coloring Book Studio</h1>
+  <p id="usage" class="usage">Pages made today: …</p>
+</header>
+
+<nav>
+  <button class="tab active" data-tab="make">Make a Page</button>
+  <button class="tab" data-tab="library">My Pages</button>
+</nav>
+
+<main>
+  <section id="make" class="panel">
+    <label for="subject">Describe your scene</label>
+    <textarea id="subject" rows="3" maxlength="500" placeholder="Example: an owl in a gothic cathedral window"></textarea>
+
+    <label>Or pick a theme</label>
+    <div id="themes" class="themes"></div>
+
+    <label for="difficulty">Difficulty: <span id="diffLabel">3</span></label>
+    <input id="difficulty" type="range" min="1" max="5" step="1" value="3">
+    <div class="range-ends"><span>Simple</span><span>Very detailed</span></div>
+
+    <label for="seed">Seed number</label>
+    <div class="row">
+      <input id="seed" type="number" min="0" max="999999" placeholder="Random">
+      <label class="check"><input id="lockSeed" type="checkbox"> Lock seed</label>
+    </div>
+
+    <div class="row">
+      <button id="generate" class="big primary">Make Page</button>
+      <button id="random" class="big">Random</button>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+
+    <div id="result" class="result" hidden>
+      <img id="resultImg" alt="Your coloring page">
+      <p id="resultInfo" class="info"></p>
+      <div class="row">
+        <button id="downloadPng" class="big">Download PNG</button>
+        <button id="again" class="big">Make Another</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="library" class="panel" hidden>
+    <div class="row">
+      <select id="filterTheme" aria-label="Filter by theme"><option value="">All themes</option></select>
+      <label class="check"><input id="favOnly" type="checkbox"> Favorites</label>
+    </div>
+    <input id="search" type="search" placeholder="Search pages">
+    <p id="libCount" class="info"></p>
+    <div id="grid" class="grid"></div>
+
+    <div id="viewer" class="viewer" hidden>
+      <img id="viewerImg" alt="Saved coloring page">
+      <p id="viewerInfo" class="info"></p>
+      <div class="row wrap">
+        <button id="vFav" class="big">☆ Favorite</button>
+        <button id="vDownload" class="big">Download PNG</button>
+        <button id="vRemake" class="big">Remake / Vary</button>
+        <button id="vDelete" class="big danger">Delete</button>
+        <button id="vClose" class="big">Close</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
