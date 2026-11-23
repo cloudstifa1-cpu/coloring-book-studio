@@ -3,6 +3,7 @@ import { cleanBlob, sharpPng, pagePdf, saveFile } from './lib/pagetools.js';
 import { WEIGHTS, DEFAULT_WEIGHT, clampWeight, weightOf } from './lib/cleanup.js';
 import { initColorer } from './colorer.js';
 import { initBook } from './bookui.js';
+import { initHelper } from './helperui.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -11,7 +12,8 @@ let selectedTheme = '';
 let current = null;      // page just made
 let viewing = null;      // page open in viewer
 let busy = false;
-let colorer, bookUi;
+let colorer, bookUi, helperUi;
+let helperQueue = [];    // scenes sent from the AI Helper for batch mode
 
 // ---------- small helpers ----------
 function setStatus(msg, isError = false) {
@@ -164,16 +166,18 @@ async function generate() {
 let batchRunning = false;
 async function runBatch() {
   if (busy) return;
-  const total = Number($('batchCount').value);
+  const queue = helperQueue.slice();
+  const total = queue.length || Number($('batchCount').value);
   const typed = $('subject').value.trim();
-  if (!typed && !selectedTheme) { setStatus('Describe a scene or pick a theme first.', true); return; }
+  if (!queue.length && !typed && !selectedTheme) { setStatus('Describe a scene or pick a theme first.', true); return; }
   const difficulty = clampDifficulty($('difficulty').value);
   batchRunning = true;
   setBusy(true);
   let made = 0, subject = typed;
   try {
     for (let i = 0; i < total && batchRunning; i++) {
-      if (selectedTheme && (!typed || typed === lastAutoText)) subject = nextSubject(THEMES[selectedTheme], subject);
+      if (queue.length) subject = queue[i];
+      else if (selectedTheme && (!typed || typed === lastAutoText)) subject = nextSubject(THEMES[selectedTheme], subject);
       setStatus(`Batch: drawing page ${i + 1} of ${total}…`);
       try {
         showResult(await makeOne(subject, difficulty));
@@ -184,6 +188,7 @@ async function runBatch() {
       }
     }
     setStatus(`Batch done: ${made} pages saved to My Pages.`);
+    if (queue.length && made === total) { helperQueue = []; $('queueBox').hidden = true; }
   } finally {
     batchRunning = false;
     setBusy(false);
@@ -284,6 +289,7 @@ function switchTab(name) {
   $('make').hidden = name !== 'make';
   $('library').hidden = name !== 'library';
   $('book').hidden = name !== 'book';
+  $('helper').hidden = name !== 'helper';
   if (name === 'library') renderLibrary();
   if (name === 'book') bookUi.render();
 }
@@ -353,6 +359,19 @@ async function start() {
     $('diffLabel').textContent = p.difficulty;
     setStatus('Settings loaded. Tap Make Page for a new variation (this AI never draws the exact same picture twice, but your original stays saved in My Pages).');
   };
+  helperUi = initHelper({
+    $,
+    getContext: () => ({ theme: selectedTheme, difficulty: clampDifficulty($('difficulty').value), subject: $('subject').value.trim() }),
+    onUse: idea => { switchTab('make'); $('subject').value = idea; setStatus('Idea loaded. Tap Make Page.'); },
+    onBatch: ideas => {
+      helperQueue = ideas.slice();
+      $('queueInfo').textContent = `Helper list ready: ${ideas.length} pages. Tap Make Batch to draw them all.`;
+      $('queueBox').hidden = false;
+      switchTab('make');
+      setStatus('');
+    },
+  });
+  $('queueClear').onclick = () => { helperQueue = []; $('queueBox').hidden = true; setStatus('Helper list cleared.'); };
   refreshUsage();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }

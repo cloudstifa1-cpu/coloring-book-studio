@@ -9,5 +9,8 @@ Makes adult coloring book pages with AI (free Cloudflare Workers AI), saves them
 
 Optional: connect a KV namespace with the binding name `USAGE` to have the Worker count pages and enforce the daily cap (`DAILY_CAP`, default 150).
 
+## AI Helper
+The **AI Helper** tab chats with a small free text AI (`@cf/meta/llama-3.2-3b-instruct`) for theme ideas, book plans and better scene wording. Tap an idea to load it, or **Batch all** to send every idea to Make Batch. It uses the same free Workers AI daily allowance as the drawings. With `USAGE` KV connected, chat messages are capped separately (`CHAT_CAP`, default 200 a day).
+
 ## Tests
 `npm test`

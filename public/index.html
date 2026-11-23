@@ -19,6 +19,7 @@
   <button class="tab active" data-tab="make">Make a Page</button>
   <button class="tab" data-tab="library">My Pages</button>
   <button class="tab" data-tab="book">Book</button>
+  <button class="tab" data-tab="helper">AI Helper</button>
 </nav>
 
 <main>
@@ -45,6 +46,11 @@
       </select>
       <button id="batch" class="big">Make Batch</button>
       <button id="stopBatch" class="big danger" hidden>Stop</button>
+    </div>
+
+    <div id="queueBox" class="queue" hidden>
+      <p id="queueInfo" class="info"></p>
+      <button id="queueClear" class="big danger">Clear Helper List</button>
     </div>
 
     <p id="status" class="status" role="status"></p>
@@ -128,6 +134,23 @@
     <div id="bList"></div>
     <button id="bExport" class="big primary full">Make Book PDF</button>
     <p id="bStatus" class="status" role="status"></p>
+  </section>
+  <section id="helper" class="panel" hidden>
+    <p class="info">Ask for theme ideas, book plans, or better scene wording. Tap an idea to use it, or batch them all.</p>
+    <div class="row wrap">
+      <button id="hThemes" class="big">Theme Ideas</button>
+      <button id="hBook" class="big">Plan a Book</button>
+      <button id="hImprove" class="big">Improve My Scene</button>
+    </div>
+    <p id="hEmpty" class="info">No messages yet.</p>
+    <div id="hLog" class="hlog"></div>
+    <label for="hInput">Message the helper</label>
+    <textarea id="hInput" rows="3" maxlength="1200" placeholder="Example: ideas for a cozy autumn coloring book"></textarea>
+    <div class="row">
+      <button id="hSend" class="big primary">Send</button>
+      <button id="hClear" class="big danger">Clear Chat</button>
+    </div>
+    <p id="hStatus" class="status" role="status"></p>
   </section>
 </main>
 

@@ -1,6 +1,7 @@
 // Cloudflare Worker: serves the app and talks to the drawing AI.
 // No API keys: uses Cloudflare's built-in AI binding (env.AI).
 import { buildPrompt, clampDifficulty, cleanSeed, randomSeed, dayKey, DEFAULT_CAP } from '../public/lib/core.js';
+import { TEXT_MODEL, DEFAULT_CHAT_CAP, buildMessages, replyText } from '../public/lib/assistant.js';
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
@@ -57,6 +58,10 @@ export async function handleApi(request, env) {
     return json({ count: await getCount(env), cap: capOf(env), tracked: !!env.USAGE });
   }
 
+  if (url.pathname === '/api/assistant' && request.method === 'POST') {
+    return handleAssistant(request, env);
+  }
+
   if (url.pathname === '/api/generate' && request.method === 'POST') {
     let body;
     try { body = await request.json(); } catch { return json({ error: 'Bad request.' }, 400); }
@@ -107,6 +112,39 @@ export async function handleApi(request, env) {
   }
 
   return json({ error: 'Not found.' }, 404);
+}
+
+// AI Helper chat: small free text model, shares the same free daily allowance.
+async function handleAssistant(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Bad request.' }, 400); }
+  let messages;
+  try { messages = buildMessages(body.messages, { theme: body.theme, difficulty: body.difficulty }); }
+  catch (e) { return json({ error: e.message }, 400); }
+
+  const n = Number(env.CHAT_CAP);
+  const cap = Number.isFinite(n) && n > 0 ? n : DEFAULT_CHAT_CAP;
+  const key = 'chat:' + dayKey();
+  const count = env.USAGE ? Number(await env.USAGE.get(key)) || 0 : null;
+  if (count !== null && count >= cap) {
+    return json({ error: `Helper daily limit reached (${cap} messages). It resets at 6 PM Oklahoma time (7 PM in summer).` }, 429);
+  }
+  if (!env.AI) return json({ error: 'The app is not connected to Cloudflare AI.' }, 500);
+
+  let text;
+  try {
+    text = replyText(await env.AI.run(TEXT_MODEL, { messages, max_tokens: 700, temperature: 0.8 })).trim();
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    if (/4006|allocation|limit|quota/i.test(msg)) {
+      return json({ error: 'Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).' }, 429);
+    }
+    console.error('Helper AI error:', msg);
+    return json({ error: 'The helper AI had a problem. Try again.', detail: msg.slice(0, 300) }, 502);
+  }
+  if (!text) return json({ error: 'The helper AI sent back nothing. Try again.' }, 502);
+  if (env.USAGE) await env.USAGE.put(key, String(count + 1), { expirationTtl: 172800 });
+  return json({ reply: text });
 }
 
 export default {
