@@ -52,7 +52,7 @@ test('bad JSON refused', async () => {
 test('daily cap blocks generation and never calls AI', async () => {
   const AI = fakeAI();
   const USAGE = fakeKV();
-  const env = { AI, USAGE, DAILY_CAP: '2' };
+  const env = { AI, USAGE, DAILY_CAP: '2', POLLINATIONS: 'off' };
   assert.equal((await handleApi(post({ subject: 'a' }), env)).status, 200);
   assert.equal((await handleApi(post({ subject: 'b' }), env)).status, 200);
   const r = await handleApi(post({ subject: 'c' }), env);
@@ -71,7 +71,7 @@ test('failed AI call does not count toward cap', async () => {
 });
 
 test('free allowance used up gives friendly 429', async () => {
-  const env = { AI: fakeAI(() => { throw new Error('4006: daily free allocation exceeded'); }) };
+  const env = { AI: fakeAI(() => { throw new Error('4006: daily free allocation exceeded'); }), POLLINATIONS: 'off' };
   const r = await handleApi(post({ subject: 'a' }), env);
   assert.equal(r.status, 429);
   assert.match((await r.json()).error, /Free daily AI allowance/);
@@ -115,4 +115,39 @@ test('missing AI connection gives clear message', async () => {
   const r = await handleApi(post({ subject: 'a' }), {});
   assert.equal(r.status, 500);
   assert.match((await r.json()).error, /not connected/);
+});
+
+const okFetch = calls => async (url) => { calls.push(url); return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } }); };
+
+test('backup AI used when daily cap reached', async () => {
+  const calls = [];
+  const USAGE = fakeKV();
+  USAGE.m.set('count:' + new Date().toISOString().slice(0, 10), '5');
+  const AI = fakeAI();
+  const r = await handleApi(post({ subject: 'an owl', seed: 9 }), { AI, USAGE, DAILY_CAP: '5', fetchImpl: okFetch(calls) });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-source'), 'pollinations');
+  assert.equal(AI.calls.length, 0);
+  assert.match(calls[0], /^https:\/\/image\.pollinations\.ai\/prompt\/an%20owl/);
+  assert.match(calls[0], /seed=9/);
+});
+
+test('backup AI used when free allowance used up', async () => {
+  const calls = [];
+  const env = { AI: fakeAI(() => { throw new Error('4006: daily free allocation exceeded'); }), fetchImpl: okFetch(calls) };
+  const r = await handleApi(post({ subject: 'a' }), env);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-source'), 'pollinations');
+});
+
+test('backup that sends non-image is treated as busy', async () => {
+  const env = { AI: fakeAI(() => { throw new Error('4006'); }), fetchImpl: async () => new Response('rate limited', { status: 429 }) };
+  const r = await handleApi(post({ subject: 'a' }), env);
+  assert.equal(r.status, 429);
+  assert.match((await r.json()).error, /backup AI is busy/);
+});
+
+test('normal pages say they came from cloudflare', async () => {
+  const r = await handleApi(post({ subject: 'a' }), { AI: fakeAI() });
+  assert.equal(r.headers.get('x-source'), 'cloudflare');
 });

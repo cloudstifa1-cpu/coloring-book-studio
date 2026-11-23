@@ -1,4 +1,5 @@
 import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
+import { cleanBlob, sharpPng, pagePdf, saveFile } from './lib/pagetools.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -54,7 +55,7 @@ async function downloadPng(page) {
   const png = await new Promise(res => c.toBlob(res, 'image/png'));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(png);
-  a.download = `coloring-${page.theme || 'page'}-seed${page.seed}.png`;
+  a.download = `coloring-${page.theme || 'page'}-${page.id}.png`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -65,7 +66,8 @@ function showImage(img, blob) {
 }
 
 function infoText(p) {
-  return `${p.subject} — Difficulty ${p.difficulty} — Seed ${p.seed}`;
+  const lines = ['Thinner', 'Normal', 'Thicker', 'Extra thick'][(p.thickness || 0) + 1];
+  return `${p.subject} — Difficulty ${p.difficulty} — Lines: ${lines}`;
 }
 
 // ---------- Make a Page ----------
@@ -97,51 +99,116 @@ function pickTheme(name) {
   }
 }
 
+// Asks the AI for one page, cleans it, saves it. Returns the page or throws a message.
+async function makeOne(subject, difficulty) {
+  const r = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ subject, difficulty, seed: randomSeed() }),
+  }).catch(() => { throw new Error('No connection to the drawing AI. Check your internet and try again.'); });
+  if (!r.ok) {
+    let msg = 'Something went wrong. Try again.';
+    try { const e = await r.json(); msg = (e.error || msg) + (e.detail ? ` (Details: ${e.detail})` : ''); } catch {}
+    throw new Error(msg);
+  }
+  const original = await r.blob();
+  const blob = await cleanBlob(original, 0);
+  const page = {
+    id: makeId(), created: Date.now(), subject, theme: selectedTheme, difficulty,
+    seed: Number(r.headers.get('x-seed')) || 0, source: r.headers.get('x-source') || 'cloudflare',
+    favorite: false, original, blob, thickness: 0, thumb: await makeThumb(blob),
+  };
+  await savePage(db, page);
+  bumpLocalCount();
+  return page;
+}
+
+function showResult(page) {
+  current = page;
+  showImage($('resultImg'), page.blob);
+  $('resultInfo').textContent = infoText(page);
+  $('result').hidden = false;
+}
+
+function setBusy(on) {
+  busy = on;
+  $('generate').disabled = $('random').disabled = $('batch').disabled = on;
+  $('stopBatch').hidden = !batchRunning;
+}
+
 async function generate() {
   if (busy) return;
   const subject = $('subject').value.trim();
   if (!subject) { setStatus('Please describe a scene or pick a theme.', true); return; }
-  const difficulty = clampDifficulty($('difficulty').value);
-  let seed = cleanSeed($('seed').value);
-  if (seed === null || !$('lockSeed').checked) seed = randomSeed();
-  $('seed').value = seed;
-
-  busy = true;
-  $('generate').disabled = $('random').disabled = true;
+  setBusy(true);
   setStatus('Drawing your page… this takes about 5–20 seconds.');
   try {
-    const r = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ subject, difficulty, seed }),
-    });
-    if (!r.ok) {
-      let msg = 'Something went wrong. Try again.';
-      try { const e = await r.json(); msg = (e.error || msg) + (e.detail ? ` (Details: ${e.detail})` : ''); } catch {}
-      setStatus(msg, true);
-      return;
-    }
-    const blob = await r.blob();
-    const page = {
-      id: makeId(), created: Date.now(), subject, theme: selectedTheme,
-      difficulty, seed: Number(r.headers.get('x-seed')) || seed,
-      favorite: false, blob, thumb: await makeThumb(blob),
-    };
-    await savePage(db, page);
-    bumpLocalCount();
-    current = page;
-    $('seed').value = page.seed;
-    showImage($('resultImg'), blob);
-    $('resultInfo').textContent = infoText(page);
-    $('result').hidden = false;
-    setStatus('Saved to My Pages.');
+    const page = await makeOne(subject, clampDifficulty($('difficulty').value));
+    showResult(page);
+    setStatus(page.source === 'pollinations' ? 'Saved to My Pages (made by the backup AI).' : 'Saved to My Pages.');
     refreshUsage();
-  } catch {
-    setStatus('No connection to the drawing AI. Check your internet and try again.', true);
+  } catch (e) {
+    setStatus(e.message, true);
   } finally {
-    busy = false;
-    $('generate').disabled = $('random').disabled = false;
+    setBusy(false);
   }
+}
+
+// Batch: makes several pages in a row, one at a time (protects phone memory).
+let batchRunning = false;
+async function runBatch() {
+  if (busy) return;
+  const total = Number($('batchCount').value);
+  const typed = $('subject').value.trim();
+  if (!typed && !selectedTheme) { setStatus('Describe a scene or pick a theme first.', true); return; }
+  const difficulty = clampDifficulty($('difficulty').value);
+  batchRunning = true;
+  setBusy(true);
+  let made = 0, subject = typed;
+  try {
+    for (let i = 0; i < total && batchRunning; i++) {
+      if (selectedTheme && (!typed || typed === lastAutoText)) subject = nextSubject(THEMES[selectedTheme], subject);
+      setStatus(`Batch: drawing page ${i + 1} of ${total}…`);
+      try {
+        showResult(await makeOne(subject, difficulty));
+        made++;
+      } catch (e) {
+        setStatus(`Batch stopped after ${made} pages: ${e.message}`, true);
+        return;
+      }
+    }
+    setStatus(`Batch done: ${made} pages saved to My Pages.`);
+  } finally {
+    batchRunning = false;
+    setBusy(false);
+    refreshUsage();
+  }
+}
+
+async function setThickness(page, t, img, info) {
+  if (!page || busy) return;
+  setBusy(true);
+  try {
+    page.thickness = Math.max(-1, Math.min(2, t));
+    page.original = page.original || page.blob;
+    page.blob = await cleanBlob(page.original, page.thickness);
+    page.thumb = await makeThumb(page.blob);
+    await savePage(db, page);
+    showImage(img, page.blob);
+    info.textContent = infoText(page);
+  } finally { setBusy(false); }
+}
+
+async function download(page, kind) {
+  if (!page) return;
+  const name = `coloring-${page.theme || 'page'}-${page.id}`;
+  setStatus('Preparing your file…');
+  try {
+    if (kind === 'png') await downloadPng(page);
+    if (kind === 'print') saveFile(await sharpPng(page.blob), name + '-print.png');
+    if (kind === 'pdf') saveFile(await pagePdf(page.blob, $('pdfSize').value), name + '.pdf');
+    setStatus('Download started.');
+  } catch { setStatus('Could not make the file. Try again.', true); }
 }
 
 function randomize() {
@@ -151,8 +218,6 @@ function randomize() {
   $('subject').value = lastAutoText = p.subject;
   $('difficulty').value = p.difficulty;
   $('diffLabel').textContent = p.difficulty;
-  $('seed').value = p.seed;
-  $('lockSeed').checked = true;
   generate();
 }
 
@@ -213,11 +278,21 @@ async function start() {
   $('generate').onclick = generate;
   $('random').onclick = randomize;
   $('again').onclick = generate;
-  $('downloadPng').onclick = () => current && downloadPng(current);
+  $('downloadPng').onclick = () => download(current, 'png');
+  $('downloadPrint').onclick = () => download(current, 'print');
+  $('downloadPdf').onclick = () => download(current, 'pdf');
+  $('thinner').onclick = () => current && setThickness(current, current.thickness - 1, $('resultImg'), $('resultInfo'));
+  $('thicker').onclick = () => current && setThickness(current, current.thickness + 1, $('resultImg'), $('resultInfo'));
+  $('vThinner').onclick = () => viewing && setThickness(viewing, (viewing.thickness || 0) - 1, $('viewerImg'), $('viewerInfo'));
+  $('vThicker').onclick = () => viewing && setThickness(viewing, (viewing.thickness || 0) + 1, $('viewerImg'), $('viewerInfo'));
+  $('vPrint').onclick = () => download(viewing, 'print');
+  $('vPdf').onclick = () => download(viewing, 'pdf');
+  $('batch').onclick = runBatch;
+  $('stopBatch').onclick = () => { batchRunning = false; setStatus('Stopping after this page…'); };
   $('filterTheme').onchange = $('favOnly').onchange = renderLibrary;
   $('search').oninput = renderLibrary;
   $('vClose').onclick = closeViewer;
-  $('vDownload').onclick = () => viewing && downloadPng(viewing);
+  $('vDownload').onclick = () => download(viewing, 'png');
   $('vFav').onclick = async () => {
     viewing.favorite = !viewing.favorite;
     await savePage(db, viewing);
@@ -239,8 +314,6 @@ async function start() {
     if (p.theme) pickTheme(p.theme);
     $('difficulty').value = p.difficulty;
     $('diffLabel').textContent = p.difficulty;
-    $('seed').value = p.seed;
-    $('lockSeed').checked = true;
     setStatus('Settings loaded. Tap Make Page for a new variation (this AI never draws the exact same picture twice, but your original stays saved in My Pages).');
   };
   refreshUsage();

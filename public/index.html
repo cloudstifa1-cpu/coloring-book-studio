@@ -32,15 +32,18 @@
     <input id="difficulty" type="range" min="1" max="5" step="1" value="3">
     <div class="range-ends"><span>Simple</span><span>Very detailed</span></div>
 
-    <label for="seed">Seed number</label>
-    <div class="row">
-      <input id="seed" type="number" min="0" max="999999" placeholder="Random">
-      <label class="check"><input id="lockSeed" type="checkbox"> Lock seed</label>
-    </div>
-
     <div class="row">
       <button id="generate" class="big primary">Make Page</button>
       <button id="random" class="big">Random</button>
+    </div>
+
+    <div class="row">
+      <select id="batchCount" aria-label="How many pages">
+        <option value="5">5 pages</option>
+        <option value="10">10 pages</option>
+      </select>
+      <button id="batch" class="big">Make Batch</button>
+      <button id="stopBatch" class="big danger" hidden>Stop</button>
     </div>
 
     <p id="status" class="status" role="status"></p>
@@ -49,7 +52,19 @@
       <img id="resultImg" alt="Your coloring page">
       <p id="resultInfo" class="info"></p>
       <div class="row">
+        <button id="thinner" class="big">Thinner lines</button>
+        <button id="thicker" class="big">Thicker lines</button>
+      </div>
+      <label for="pdfSize">PDF page size</label>
+      <select id="pdfSize">
+        <option value="letter">8.5 × 11 in</option>
+        <option value="8x10">8 × 10 in</option>
+        <option value="6x9">6 × 9 in</option>
+      </select>
+      <div class="row wrap">
         <button id="downloadPng" class="big">Download PNG</button>
+        <button id="downloadPrint" class="big">Print-Sharp PNG</button>
+        <button id="downloadPdf" class="big">Download PDF</button>
         <button id="again" class="big">Make Another</button>
       </div>
     </div>
@@ -69,7 +84,11 @@
       <p id="viewerInfo" class="info"></p>
       <div class="row wrap">
         <button id="vFav" class="big">☆ Favorite</button>
+        <button id="vThinner" class="big">Thinner lines</button>
+        <button id="vThicker" class="big">Thicker lines</button>
         <button id="vDownload" class="big">Download PNG</button>
+        <button id="vPrint" class="big">Print-Sharp PNG</button>
+        <button id="vPdf" class="big">Download PDF</button>
         <button id="vRemake" class="big">Remake / Vary</button>
         <button id="vDelete" class="big danger">Delete</button>
         <button id="vClose" class="big">Close</button>

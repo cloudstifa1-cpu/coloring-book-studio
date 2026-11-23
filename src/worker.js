@@ -34,6 +34,22 @@ function base64ToBytes(b64) {
   return out;
 }
 
+export function pollinationsUrl(prompt, seed) {
+  return 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) +
+    `?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
+}
+
+// Returns image bytes, or null if the backup failed.
+async function pollinations(prompt, seed, env) {
+  if (env.POLLINATIONS === 'off') return null;
+  const f = env.fetchImpl || fetch;
+  try {
+    const r = await f(pollinationsUrl(prompt, seed), { signal: AbortSignal.timeout(90000) });
+    if (!r.ok || !(r.headers.get('content-type') || '').startsWith('image/')) return null;
+    return new Uint8Array(await r.arrayBuffer());
+  } catch { return null; }
+}
+
 export async function handleApi(request, env) {
   const url = new URL(request.url);
 
@@ -51,11 +67,26 @@ export async function handleApi(request, env) {
 
     const cap = capOf(env);
     const count = await getCount(env);
+    const seed = cleanSeed(body.seed) ?? randomSeed();
+    const headers = source => ({
+      'content-type': 'image/jpeg',
+      'x-seed': String(seed),
+      'x-difficulty': String(clampDifficulty(body.difficulty)),
+      'x-source': source,
+      'cache-control': 'no-store',
+    });
+
+    // Free backup used when Cloudflare's daily cap or free allowance is used up.
+    const backup = async reason => {
+      const bytes = await pollinations(prompt, seed, env);
+      if (bytes) return new Response(bytes, { headers: headers('pollinations') });
+      return json({ error: reason + ' The free backup AI is busy too. Wait a minute and try again.' }, 429);
+    };
+
     if (count !== null && count >= cap) {
-      return json({ error: `Daily limit reached (${cap} pages). It resets at 6 PM Oklahoma time (7 PM in summer).` }, 429);
+      return backup(`Daily limit reached (${cap} pages). It resets at 6 PM Oklahoma time (7 PM in summer).`);
     }
 
-    const seed = cleanSeed(body.seed) ?? randomSeed();
     let result;
     try {
       // flux-1-schnell does not accept a seed (Cloudflare error 5006), so only prompt + steps are sent.
@@ -63,7 +94,7 @@ export async function handleApi(request, env) {
     } catch (e) {
       const msg = String(e && e.message || e);
       if (/4006|allocation|limit|quota/i.test(msg)) {
-        return json({ error: 'Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).' }, 429);
+        return backup('Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).');
       }
       console.error('AI error:', msg);
       if (!env.AI) return json({ error: 'The app is not connected to Cloudflare AI.', detail: 'AI binding missing' }, 500);
@@ -72,14 +103,7 @@ export async function handleApi(request, env) {
     if (!result || !result.image) return json({ error: 'The drawing AI sent back nothing. Try again.' }, 502);
 
     await addCount(env, count ?? 0);
-    return new Response(base64ToBytes(result.image), {
-      headers: {
-        'content-type': 'image/jpeg',
-        'x-seed': String(seed),
-        'x-difficulty': String(clampDifficulty(body.difficulty)),
-        'cache-control': 'no-store',
-      },
-    });
+    return new Response(base64ToBytes(result.image), { headers: headers('cloudflare') });
   }
 
   return json({ error: 'Not found.' }, 404);
