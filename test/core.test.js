@@ -73,3 +73,12 @@ test('theme tap always gives a different description', () => {
   }
   assert.equal(nextSubject(['only'], 'only'), 'only');
 });
+
+test('people and vehicles themes exist and every theme has at least 15 scenes', () => {
+  assert.ok(THEMES.people && THEMES.vehicles);
+  for (const [name, list] of Object.entries(THEMES)) {
+    assert.ok(list.length >= 15, name + ' has too few scenes');
+    assert.equal(new Set(list).size, list.length, name + ' has a repeated scene');
+    assert.ok(list.every(x => x.length > 3 && x.length < 120));
+  }
+});

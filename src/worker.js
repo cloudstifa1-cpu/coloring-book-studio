@@ -126,10 +126,17 @@ async function handleAssistant(request, env) {
   const cap = Number.isFinite(n) && n > 0 ? n : DEFAULT_CHAT_CAP;
   const key = 'chat:' + dayKey();
   const count = env.USAGE ? Number(await env.USAGE.get(key)) || 0 : null;
+  // Free backup chat AI, used when Cloudflare's chat is capped, used up, or broken.
+  const backup = async reason => {
+    const text = await pollinationsChat(messages, env);
+    if (text) return json({ reply: text, source: 'pollinations' });
+    return json({ error: reason + ' The free backup AI is busy too. Wait a minute and try again.' }, reason.includes('not connected') ? 500 : 429);
+  };
+
   if (count !== null && count >= cap) {
-    return json({ error: `Helper daily limit reached (${cap} messages). It resets at 6 PM Oklahoma time (7 PM in summer).` }, 429);
+    return backup(`Helper daily limit reached (${cap} messages). It resets at 6 PM Oklahoma time (7 PM in summer).`);
   }
-  if (!env.AI) return json({ error: 'The app is not connected to Cloudflare AI.' }, 500);
+  if (!env.AI) return backup('The app is not connected to Cloudflare AI.');
 
   let text;
   try {
@@ -137,14 +144,40 @@ async function handleAssistant(request, env) {
   } catch (e) {
     const msg = String(e && e.message || e);
     if (/4006|allocation|limit|quota/i.test(msg)) {
-      return json({ error: 'Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).' }, 429);
+      return backup('Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).');
     }
     console.error('Helper AI error:', msg);
-    return json({ error: 'The helper AI had a problem. Try again.', detail: msg.slice(0, 300) }, 502);
+    const r = await backup('The helper AI had a problem. Try again.');
+    return r.status === 200 ? r : json({ error: 'The helper AI had a problem. Try again.', detail: msg.slice(0, 300) }, 502);
   }
-  if (!text) return json({ error: 'The helper AI sent back nothing. Try again.' }, 502);
+  if (!text) {
+    const r = await backup('The helper AI sent back nothing. Try again.');
+    return r.status === 200 ? r : json({ error: 'The helper AI sent back nothing. Try again.' }, 502);
+  }
   if (env.USAGE) await env.USAGE.put(key, String(count + 1), { expirationTtl: 172800 });
-  return json({ reply: text });
+  return json({ reply: text, source: 'cloudflare' });
+}
+
+export const POLLINATIONS_CHAT = 'https://text.pollinations.ai/openai';
+
+// Returns reply text, or null if the backup failed.
+async function pollinationsChat(messages, env) {
+  if (env.POLLINATIONS === 'off') return null;
+  const f = env.fetchImpl || fetch;
+  try {
+    const r = await f(POLLINATIONS_CHAT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'openai', messages, private: true }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) return null;
+    const raw = await r.text();
+    let text;
+    try { text = replyText(JSON.parse(raw)); } catch { text = raw; }
+    text = String(text || '').trim();
+    return text ? text.slice(0, 6000) : null;
+  } catch { return null; }
 }
 
 export default {

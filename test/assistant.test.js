@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleApi } from '../src/worker.js';
+import { handleApi, POLLINATIONS_CHAT } from '../src/worker.js';
 import { TEXT_MODEL, MAX_TURNS, MAX_IDEAS, SYSTEM_PROMPT, QUICK, cleanHistory, buildMessages, parseIdeas, stripIdeas, replyText } from '../public/lib/assistant.js';
 import { MAX_PROMPT } from '../public/lib/core.js';
 
@@ -91,7 +91,7 @@ test('assistant refuses bad JSON and empty chat without calling AI', async () =>
 
 test('assistant daily cap blocks and never calls AI', async () => {
   const AI = fakeAI();
-  const env = { AI, USAGE: fakeKV(), CHAT_CAP: '1' };
+  const env = { AI, USAGE: fakeKV(), CHAT_CAP: '1', POLLINATIONS: 'off' };
   assert.equal((await handleApi(post({ messages: [user('a')] }), env)).status, 200);
   const r = await handleApi(post({ messages: [user('b')] }), env);
   assert.equal(r.status, 429);
@@ -109,24 +109,79 @@ test('chat count is separate from the page count', async () => {
 
 test('used-up free allowance gives a clear message', async () => {
   const AI = fakeAI(() => { throw new Error('4006: daily free allocation exceeded'); });
-  const r = await handleApi(post({ messages: [user('a')] }), { AI });
+  const r = await handleApi(post({ messages: [user('a')] }), { AI, POLLINATIONS: 'off' });
   assert.equal(r.status, 429);
   assert.match((await r.json()).error, /allowance is used up/);
 });
 
 test('other AI errors and empty answers give 502', async () => {
-  const boom = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => { throw new Error('x'); }) });
+  const boom = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => { throw new Error('x'); }), POLLINATIONS: 'off' });
   assert.equal(boom.status, 502);
-  const empty = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => ({ response: '  ' })) });
+  const empty = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => ({ response: '  ' })), POLLINATIONS: 'off' });
   assert.equal(empty.status, 502);
 });
 
 test('missing AI binding gives 500', async () => {
-  const r = await handleApi(post({ messages: [user('a')] }), {});
+  const r = await handleApi(post({ messages: [user('a')] }), { POLLINATIONS: 'off' });
   assert.equal(r.status, 500);
 });
 
 test('GET on assistant is not found', async () => {
   const r = await handleApi(new Request('https://x/api/assistant'), { AI: fakeAI() });
   assert.equal(r.status, 404);
+});
+
+// ---- free chat backup ----
+function fakeFetch(res) {
+  const calls = [];
+  const f = async (url, opts) => { calls.push({ url, body: JSON.parse(opts.body) }); if (res instanceof Error) throw res; return res; };
+  f.calls = calls; return f;
+}
+const okJson = obj => new Response(JSON.stringify(obj), { status: 200, headers: { 'content-type': 'application/json' } });
+
+test('backup answers when the helper daily cap is reached', async () => {
+  const fetchImpl = fakeFetch(okJson({ choices: [{ message: { content: 'IDEA: a backup fox' } }] }));
+  const env = { AI: fakeAI(), USAGE: fakeKV(), CHAT_CAP: '1', fetchImpl };
+  await handleApi(post({ messages: [user('a')] }), env);
+  const r = await handleApi(post({ messages: [user('b')] }), env);
+  assert.equal(r.status, 200);
+  const data = await r.json();
+  assert.equal(data.source, 'pollinations');
+  assert.match(data.reply, /backup fox/);
+  assert.equal(fetchImpl.calls[0].url, POLLINATIONS_CHAT);
+  assert.equal(fetchImpl.calls[0].body.messages[0].role, 'system');
+  assert.equal(env.AI.calls.length, 1);   // Cloudflare not called past the cap
+});
+
+test('backup answers when free allowance is used up or AI breaks', async () => {
+  for (const err of ['4006: daily free allocation exceeded', 'random crash']) {
+    const fetchImpl = fakeFetch(okJson({ choices: [{ message: { content: 'hello from backup' } }] }));
+    const r = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => { throw new Error(err); }), fetchImpl });
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).reply, 'hello from backup');
+  }
+});
+
+test('backup accepts a plain text answer', async () => {
+  const fetchImpl = fakeFetch(new Response('just words', { status: 200 }));
+  const r = await handleApi(post({ messages: [user('a')] }), { fetchImpl });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).reply, 'just words');
+});
+
+test('when the backup also fails, the original message is kept', async () => {
+  const down = fakeFetch(new Response('no', { status: 500 }));
+  const r = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => { throw new Error('4006'); }), fetchImpl: down });
+  assert.equal(r.status, 429);
+  assert.match((await r.json()).error, /allowance is used up.*backup AI is busy/);
+  const net = fakeFetch(new Error('offline'));
+  const r2 = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(() => { throw new Error('boom'); }), fetchImpl: net });
+  assert.equal(r2.status, 502);
+});
+
+test('normal Cloudflare answers say their source and skip the backup', async () => {
+  const fetchImpl = fakeFetch(okJson({}));
+  const r = await handleApi(post({ messages: [user('a')] }), { AI: fakeAI(), fetchImpl });
+  assert.equal((await r.json()).source, 'cloudflare');
+  assert.equal(fetchImpl.calls.length, 0);
 });

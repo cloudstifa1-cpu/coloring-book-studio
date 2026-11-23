@@ -64,7 +64,7 @@ export function initHelper({ $, getContext, onUse, onBatch }) {
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.reply) throw new Error(data.error || 'The helper did not answer. Try again.');
       history.push({ role: 'assistant', content: data.reply });
-      status('');
+      status(data.source === 'pollinations' ? 'Answered by the free backup AI.' : '');
     } catch (e) {
       history.pop();              // let them resend the same message
       $('hInput').value = text;
