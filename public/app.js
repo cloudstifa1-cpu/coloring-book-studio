@@ -1,6 +1,8 @@
 import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
 import { cleanBlob, sharpPng, pagePdf, saveFile } from './lib/pagetools.js';
 import { WEIGHTS, DEFAULT_WEIGHT, clampWeight, weightOf } from './lib/cleanup.js';
+import { initColorer } from './colorer.js';
+import { initBook } from './bookui.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -9,6 +11,7 @@ let selectedTheme = '';
 let current = null;      // page just made
 let viewing = null;      // page open in viewer
 let busy = false;
+let colorer, bookUi;
 
 // ---------- small helpers ----------
 function setStatus(msg, isError = false) {
@@ -125,6 +128,7 @@ async function makeOne(subject, difficulty) {
 
 function showResult(page) {
   current = page;
+  $('addBook').textContent = 'Add to Book';
   $('weight').value = weightOf(page);
   $('weightLabel').textContent = weightLabel(weightOf(page));
   showImage($('resultImg'), page.blob);
@@ -249,6 +253,7 @@ async function renderLibrary() {
     img.alt = '';
     b.appendChild(img);
     if (p.favorite) { const s = document.createElement('span'); s.className = 'star'; s.textContent = '★'; b.appendChild(s); }
+    if (p.colored) { const s = document.createElement('span'); s.className = 'paint'; s.textContent = '🎨'; b.appendChild(s); }
     b.onclick = () => openViewer(p.id);
     grid.appendChild(b);
   }
@@ -262,6 +267,8 @@ async function openViewer(id) {
   $('vWeightLabel').textContent = weightLabel(weightOf(viewing));
   $('viewerInfo').textContent = infoText(viewing);
   $('vFav').textContent = viewing.favorite ? '★ Favorited' : '☆ Favorite';
+  $('vColoredDl').hidden = !viewing.colored;
+  $('vAddBook').textContent = bookUi.has(viewing.id) ? '✓ In Book' : 'Add to Book';
   $('viewer').hidden = false;
 }
 
@@ -276,7 +283,9 @@ function switchTab(name) {
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === name);
   $('make').hidden = name !== 'make';
   $('library').hidden = name !== 'library';
+  $('book').hidden = name !== 'book';
   if (name === 'library') renderLibrary();
+  if (name === 'book') bookUi.render();
 }
 
 // ---------- start ----------
@@ -305,6 +314,17 @@ async function start() {
   $('vPrint').onclick = () => download(viewing, 'print');
   $('vPdf').onclick = () => download(viewing, 'pdf');
   $('batch').onclick = runBatch;
+  colorer = initColorer({ $, db, savePage, saveFile, onClose: p => {
+    if (!$('viewer').hidden && viewing && viewing.id === p.id) openViewer(p.id);
+    if (!$('library').hidden) renderLibrary();
+  } });
+  bookUi = initBook({ $, db, listPages, getPage });
+  $('colorThis').onclick = () => current && colorer.open(current);
+  $('vColor').onclick = () => viewing && colorer.open(viewing);
+  const addToBook = (p, btn) => { if (!p) return; const n = bookUi.add(p.id); btn.textContent = '✓ In Book'; setStatus(`Added to book (${n} pages).`); };
+  $('addBook').onclick = () => addToBook(current, $('addBook'));
+  $('vAddBook').onclick = () => addToBook(viewing, $('vAddBook'));
+  $('vColoredDl').onclick = () => viewing && viewing.colored && saveFile(viewing.colored, `colored-${viewing.theme || 'page'}-${viewing.id}.png`);
   $('stopBatch').onclick = () => { batchRunning = false; setStatus('Stopping after this page…'); };
   $('filterTheme').onchange = $('favOnly').onchange = renderLibrary;
   $('search').oninput = renderLibrary;

@@ -14,7 +14,8 @@ export function fitImage(imgW, imgH, pageW, pageH, margin) {
   return { x: (pageW - w) / 2, y: (pageH - h) / 2, w, h };
 }
 
-// pages: [{ jpeg: Uint8Array, width, height } | { blank: true }]
+// pages: [{ jpeg: Uint8Array, width, height, margin?: inches, frame?: true } | { blank: true }]
+// frame draws a simple black border around the picture.
 export function makePdf(pages, { size = 'letter', margin = 0.5 } = {}) {
   const ps = PAGE_SIZES[size] || PAGE_SIZES.letter;
   const PW = ps.w * 72, PH = ps.h * 72, M = margin * 72;
@@ -44,8 +45,14 @@ export function makePdf(pages, { size = 'letter', margin = 0.5 } = {}) {
     push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources ${res} /Contents ${o.content} 0 R >>\nendobj\n`);
     let stream = '';
     if (!p.blank) {
-      const f = fitImage(p.width, p.height, PW, PH, M);
+      const m = p.margin != null ? p.margin * 72 : M;
+      const f = fitImage(p.width, p.height, PW, PH, p.frame ? m + 12 : m);
       stream = `q ${f.w.toFixed(2)} 0 0 ${f.h.toFixed(2)} ${f.x.toFixed(2)} ${f.y.toFixed(2)} cm /Im${i} Do Q`;
+      if (p.frame) {
+        const bx = m, by = m, bw = PW - 2 * m, bh = PH - 2 * m;
+        stream += `\nq 3 w 0 0 0 RG ${bx.toFixed(2)} ${by.toFixed(2)} ${bw.toFixed(2)} ${bh.toFixed(2)} re S Q`;
+        stream += `\nq 1 w 0 0 0 RG ${(bx + 6).toFixed(2)} ${(by + 6).toFixed(2)} ${(bw - 12).toFixed(2)} ${(bh - 12).toFixed(2)} re S Q`;
+      }
     }
     startObj(o.content);
     push(`<< /Length ${enc.encode(stream).length} >>\nstream\n${stream}\nendstream\nendobj\n`);

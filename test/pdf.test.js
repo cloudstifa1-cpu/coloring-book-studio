@@ -41,3 +41,16 @@ test('image bytes are inside the pdf', () => {
   const s = text(b);
   assert.ok(s.includes('\xff\xd8\xff\xd9'));
 });
+
+test('full-page images (cover) use zero margin', () => {
+  const s = text(makePdf([{ ...jpeg, width: 850, height: 1100, margin: 0 }]));
+  assert.match(s, /q 612\.00 0 0 792\.00 0\.00 0\.00 cm/);
+});
+
+test('frame draws a double border inside the margin', () => {
+  const s = text(makePdf([{ ...jpeg, frame: true }]));
+  assert.match(s, /3 w 0 0 0 RG 36\.00 36\.00 540\.00 720\.00 re S/);
+  assert.match(s, /1 w 0 0 0 RG 42\.00 42\.00 528\.00 708\.00 re S/);
+  // picture shrinks to fit inside the frame
+  assert.match(s, /q 516\.00 0 0 516\.00/);
+});

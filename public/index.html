@@ -18,6 +18,7 @@
 <nav>
   <button class="tab active" data-tab="make">Make a Page</button>
   <button class="tab" data-tab="library">My Pages</button>
+  <button class="tab" data-tab="book">Book</button>
 </nav>
 
 <main>
@@ -69,6 +70,8 @@
         <button id="downloadPrint" class="big">Print-Sharp PNG</button>
         <button id="downloadPdf" class="big">Download PDF</button>
         <button id="again" class="big">Make Another</button>
+        <button id="colorThis" class="big primary">Color This Page</button>
+        <button id="addBook" class="big">Add to Book</button>
       </div>
     </div>
   </section>
@@ -89,6 +92,8 @@
       <input id="vWeight" type="range" min="1" max="9" step="1" value="4">
       <div class="range-ends"><span>Thinnest</span><span>Thickest</span></div>
       <div class="row wrap">
+        <button id="vColor" class="big primary">Color</button>
+        <button id="vAddBook" class="big">Add to Book</button>
         <button id="vFav" class="big">☆ Favorite</button>
         <button id="vThinner" class="big">Thinner lines</button>
         <button id="vThicker" class="big">Thicker lines</button>
@@ -96,12 +101,67 @@
         <button id="vPrint" class="big">Print-Sharp PNG</button>
         <button id="vPdf" class="big">Download PDF</button>
         <button id="vRemake" class="big">Remake / Vary</button>
+        <button id="vColoredDl" class="big" hidden>Download Colored PNG</button>
         <button id="vDelete" class="big danger">Delete</button>
         <button id="vClose" class="big">Close</button>
       </div>
     </div>
   </section>
+  <section id="book" class="panel" hidden>
+    <label for="bTitle">Book title</label>
+    <input id="bTitle" type="text" maxlength="80">
+    <label for="bSubtitle">Subtitle (optional)</label>
+    <input id="bSubtitle" type="text" maxlength="120">
+    <label for="bAuthor">Your name (optional)</label>
+    <input id="bAuthor" type="text" maxlength="80">
+    <label for="bSize">Page size</label>
+    <select id="bSize">
+      <option value="letter">8.5 × 11 in</option>
+      <option value="8x10">8 × 10 in</option>
+      <option value="6x9">6 × 9 in</option>
+    </select>
+    <label class="check opt"><input id="bSingle" type="checkbox"> Single-sided (blank page behind each design so markers don't bleed)</label>
+    <label class="check opt"><input id="bFrame" type="checkbox"> Border around each design</label>
+    <label class="check opt"><input id="bColored" type="checkbox"> Use my colored versions (when a page has one)</label>
+    <p id="bCount" class="info"></p>
+    <p id="bEmpty" class="info">No pages yet. Open a page in My Pages and tap "Add to Book".</p>
+    <div id="bList"></div>
+    <button id="bExport" class="big primary full">Make Book PDF</button>
+    <p id="bStatus" class="status" role="status"></p>
+  </section>
 </main>
+
+<section id="colorer" class="colorer" hidden>
+  <div class="row ctop">
+    <button id="cDone" class="primary">Done</button>
+    <button id="cUndo">Undo</button>
+    <button id="cRedo">Redo</button>
+    <button id="cZoomOut" aria-label="Zoom out">−</button>
+    <span id="cZoomLabel" class="zl">1×</span>
+    <button id="cZoomIn" aria-label="Zoom in">+</button>
+  </div>
+  <div id="cWrap" class="cwrap"><canvas id="cCanvas"></canvas></div>
+  <p id="cMsg" class="status"></p>
+  <div class="ctools">
+    <div class="row">
+      <span class="info">Color:</span><span id="cCurrent" class="current"></span>
+      <label class="check">Pick any <input id="cCustom" type="color" value="#e53935"></label>
+    </div>
+    <p id="cRecentLabel" class="info" hidden>Recent:</p>
+    <div id="cRecent" class="swatches"></div>
+    <div id="cPalette" class="swatches"></div>
+    <label for="cGap">Leak guard (stops color escaping through small gaps)</label>
+    <select id="cGap">
+      <option value="0">Off</option>
+      <option value="1">Small gaps</option>
+      <option value="2">Bigger gaps</option>
+    </select>
+    <div class="row wrap">
+      <button id="cDownload" class="big">Download Colored PNG</button>
+      <button id="cClear" class="big danger">Clear Colors</button>
+    </div>
+  </div>
+</section>
 
 <script type="module" src="app.js"></script>
 </body>
