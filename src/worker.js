@@ -58,7 +58,8 @@ export async function handleApi(request, env) {
     const seed = cleanSeed(body.seed) ?? randomSeed();
     let result;
     try {
-      result = await env.AI.run(MODEL, { prompt, seed, steps: 4 });
+      // flux-1-schnell does not accept a seed (Cloudflare error 5006), so only prompt + steps are sent.
+      result = await env.AI.run(MODEL, { prompt, steps: 4 });
     } catch (e) {
       const msg = String(e && e.message || e);
       if (/4006|allocation|limit|quota/i.test(msg)) {

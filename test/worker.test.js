@@ -26,7 +26,7 @@ test('generate returns a jpeg with seed header', async () => {
   const bytes = new Uint8Array(await r.arrayBuffer());
   assert.deepEqual([...bytes], [0xff, 0xd8, 0xff, 0xd9]);
   assert.equal(AI.calls[0].model, '@cf/black-forest-labs/flux-1-schnell');
-  assert.equal(AI.calls[0].input.seed, 77);
+  assert.deepEqual(Object.keys(AI.calls[0].input).sort(), ['prompt', 'steps']);
   assert.equal(AI.calls[0].input.steps, 4);
   assert.ok(AI.calls[0].input.prompt.includes(BASE_STYLE));
 });

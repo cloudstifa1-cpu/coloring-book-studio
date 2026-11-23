@@ -241,7 +241,7 @@ async function start() {
     $('diffLabel').textContent = p.difficulty;
     $('seed').value = p.seed;
     $('lockSeed').checked = true;
-    setStatus('Same seed is locked. Change the words or difficulty a little to make a variation.');
+    setStatus('Settings loaded. Tap Make Page for a new variation (this AI never draws the exact same picture twice, but your original stays saved in My Pages).');
   };
   refreshUsage();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
