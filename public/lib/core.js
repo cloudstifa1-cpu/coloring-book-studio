@@ -70,3 +70,9 @@ export function randomPick(rand = Math.random) {
 export function dayKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
+
+// Every theme tap gives a new description (never the same one twice in a row).
+export function nextSubject(list, currentText, rand = Math.random) {
+  const choices = list.length > 1 ? list.filter(x => x !== currentText) : list;
+  return choices[Math.floor(rand() * choices.length)];
+}

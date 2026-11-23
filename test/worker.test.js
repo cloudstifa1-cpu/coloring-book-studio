@@ -102,3 +102,17 @@ test('unknown api path is 404', async () => {
   const r = await handleApi(new Request('https://x/api/nope'), {});
   assert.equal(r.status, 404);
 });
+
+test('AI error message is passed back as detail', async () => {
+  const env = { AI: fakeAI(() => { throw new Error('model said no'); }) };
+  const r = await handleApi(post({ subject: 'a' }), env);
+  const e = await r.json();
+  assert.equal(r.status, 502);
+  assert.match(e.detail, /model said no/);
+});
+
+test('missing AI connection gives clear message', async () => {
+  const r = await handleApi(post({ subject: 'a' }), {});
+  assert.equal(r.status, 500);
+  assert.match((await r.json()).error, /not connected/);
+});

@@ -64,7 +64,9 @@ export async function handleApi(request, env) {
       if (/4006|allocation|limit|quota/i.test(msg)) {
         return json({ error: 'Free daily AI allowance is used up. It resets at 6 PM Oklahoma time (7 PM in summer).' }, 429);
       }
-      return json({ error: 'The drawing AI had a problem. Try again.' }, 502);
+      console.error('AI error:', msg);
+      if (!env.AI) return json({ error: 'The app is not connected to Cloudflare AI.', detail: 'AI binding missing' }, 500);
+      return json({ error: 'The drawing AI had a problem. Try again.', detail: msg.slice(0, 300) }, 502);
     }
     if (!result || !result.image) return json({ error: 'The drawing AI sent back nothing. Try again.' }, 502);
 

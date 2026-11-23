@@ -1,4 +1,4 @@
-import { THEMES, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
+import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -84,12 +84,16 @@ function buildThemeButtons() {
   }
 }
 
+let lastAutoText = '';
+
 function pickTheme(name) {
-  selectedTheme = selectedTheme === name ? '' : name;
+  selectedTheme = name;
   for (const b of $('themes').children) b.classList.toggle('on', b.dataset.theme === selectedTheme);
-  if (selectedTheme && !$('subject').value.trim()) {
-    const list = THEMES[selectedTheme];
-    $('subject').value = list[Math.floor(Math.random() * list.length)];
+  const box = $('subject');
+  const text = box.value.trim();
+  if (!text || text === lastAutoText) {
+    lastAutoText = nextSubject(THEMES[name], text);
+    box.value = lastAutoText;
   }
 }
 
@@ -113,7 +117,7 @@ async function generate() {
     });
     if (!r.ok) {
       let msg = 'Something went wrong. Try again.';
-      try { msg = (await r.json()).error || msg; } catch {}
+      try { const e = await r.json(); msg = (e.error || msg) + (e.detail ? ` (Details: ${e.detail})` : ''); } catch {}
       setStatus(msg, true);
       return;
     }
@@ -144,7 +148,7 @@ function randomize() {
   const p = randomPick();
   selectedTheme = '';
   pickTheme(p.theme);
-  $('subject').value = p.subject;
+  $('subject').value = lastAutoText = p.subject;
   $('difficulty').value = p.difficulty;
   $('diffLabel').textContent = p.difficulty;
   $('seed').value = p.seed;

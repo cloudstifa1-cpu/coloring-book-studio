@@ -60,3 +60,16 @@ test('day key is UTC date', () => {
   assert.equal(dayKey(new Date('2026-11-23T23:30:00Z')), '2026-11-23');
   assert.equal(dayKey(new Date('2026-11-24T00:30:00Z')), '2026-11-24');
 });
+
+import { nextSubject } from '../public/lib/core.js';
+test('theme tap always gives a different description', () => {
+  const list = THEMES.gothic;
+  let cur = list[0];
+  for (let i = 0; i < 50; i++) {
+    const n = nextSubject(list, cur);
+    assert.ok(list.includes(n));
+    assert.notEqual(n, cur);
+    cur = n;
+  }
+  assert.equal(nextSubject(['only'], 'only'), 'only');
+});
