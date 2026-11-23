@@ -129,6 +129,34 @@
     <label class="check opt"><input id="bSingle" type="checkbox"> Single-sided (blank page behind each design so markers don't bleed)</label>
     <label class="check opt"><input id="bFrame" type="checkbox"> Border around each design</label>
     <label class="check opt"><input id="bColored" type="checkbox"> Use my colored versions (when a page has one)</label>
+    <h2>Cover</h2>
+    <canvas id="cPreview" class="cover-preview" aria-label="Cover preview"></canvas>
+    <label for="cStyle">Cover style</label>
+    <select id="cStyle"></select>
+    <div class="row">
+      <label class="colorpick">Background <input id="cBg" type="color"></label>
+      <label class="colorpick">Title color <input id="cTitleColor" type="color"></label>
+    </div>
+    <button id="cSwap" class="big full">Swap the two colors</button>
+    <p id="cContrast" class="status error" hidden>The title is hard to read on that background. Pick colors further apart.</p>
+    <label for="cPicture">Cover picture</label>
+    <select id="cPicture"></select>
+    <label class="check opt"><input id="cColored" type="checkbox"> Use the colored version of the page (when it has one)</label>
+    <label for="cAiSubject">AI cover picture: what should it show?</label>
+    <input id="cAiSubject" type="text" maxlength="500" placeholder="Leave empty to use the book title">
+    <button id="cMakeAi" class="big full">Make AI Cover Picture (full color)</button>
+    <label for="cBlurb">Back cover words (for the KDP cover)</label>
+    <textarea id="cBlurb" rows="4" maxlength="900"></textarea>
+    <button id="cBlurbAi" class="big full">Write It With AI</button>
+    <label for="cPaper">Paper (sets the spine width)</label>
+    <select id="cPaper"></select>
+    <p id="cWrapInfo" class="info"></p>
+    <div class="row wrap">
+      <button id="cPng" class="big">Download Cover PNG</button>
+      <button id="cWrap" class="big primary">KDP Wraparound Cover PDF</button>
+    </div>
+    <p id="cStatus" class="status" role="status"></p>
+    <h2>Pages</h2>
     <p id="bCount" class="info"></p>
     <p id="bEmpty" class="info">No pages yet. Open a page in My Pages and tap "Add to Book".</p>
     <div id="bList"></div>

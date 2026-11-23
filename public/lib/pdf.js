@@ -16,8 +16,9 @@ export function fitImage(imgW, imgH, pageW, pageH, margin) {
 
 // pages: [{ jpeg: Uint8Array, width, height, margin?: inches, frame?: true } | { blank: true }]
 // frame draws a simple black border around the picture.
-export function makePdf(pages, { size = 'letter', margin = 0.5 } = {}) {
-  const ps = PAGE_SIZES[size] || PAGE_SIZES.letter;
+// pageSize {w,h} in inches overrides size (used for the KDP wraparound cover).
+export function makePdf(pages, { size = 'letter', margin = 0.5, pageSize = null } = {}) {
+  const ps = pageSize && pageSize.w > 0 && pageSize.h > 0 ? pageSize : (PAGE_SIZES[size] || PAGE_SIZES.letter);
   const PW = ps.w * 72, PH = ps.h * 72, M = margin * 72;
   const enc = new TextEncoder();
   const chunks = [];

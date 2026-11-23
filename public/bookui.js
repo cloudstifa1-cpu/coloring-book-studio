@@ -2,6 +2,7 @@
 import { addPage, removePage, movePage, keepExisting, buildSequence, loadBook, saveBook } from './lib/book.js';
 import { makePdf, PAGE_SIZES } from './lib/pdf.js';
 import { pdfImage, saveFile } from './lib/pagetools.js';
+import { initCover, coverPage } from './coverui.js';
 
 const DPI = 200; // cover and title page resolution
 
@@ -87,6 +88,8 @@ export function initBook({ $, db, listPages, getPage }) {
   const checks = { bSingle: 'singleSided', bFrame: 'frame', bColored: 'useColored' };
 
   function save() { saveBook(book); }
+  const coverUi = initCover({ $, db, getPage, getBook: () => book, save });
+  coverUi.setLister(async () => listPages(db));
 
   function msg(t, err = false) { $('bStatus').textContent = t; $('bStatus').classList.toggle('error', err); }
 
@@ -122,11 +125,13 @@ export function initBook({ $, db, listPages, getPage }) {
     $('bEmpty').hidden = book.pageIds.length > 0;
     const total = buildSequence(book).length;
     $('bCount').textContent = `${book.pageIds.length} designs → ${total} PDF pages (with cover and title page)`;
+    coverUi.render(all);
   }
 
   for (const [id, key] of Object.entries(fields)) $(id).oninput = e => { book[key] = e.target.value; save(); };
   for (const [id, key] of Object.entries(checks)) $(id).onchange = e => { book[key] = e.target.checked; save(); render(); };
-  $('bSize').onchange = e => { book.size = e.target.value; save(); };
+  for (const id of ['bTitle', 'bSubtitle', 'bAuthor']) $(id).addEventListener('input', () => coverUi.preview());
+  $('bSize').onchange = e => { book.size = e.target.value; save(); coverUi.preview(); };
 
   $('bExport').onclick = async () => {
     if (busy) return;
@@ -134,13 +139,12 @@ export function initBook({ $, db, listPages, getPage }) {
     busy = true; $('bExport').disabled = true;
     try {
       const seq = buildSequence(book);
-      const first = await getPage(db, book.pageIds[0]);
-      const pages = [];
+            const pages = [];
       for (let i = 0; i < seq.length; i++) {
         const s = seq[i];
         msg(`Building page ${i + 1} of ${seq.length}…`);
         if (s.type === 'blank') pages.push({ blank: true });
-        else if (s.type === 'cover') pages.push(await textPage(book, 'cover', first && first.blob));
+        else if (s.type === 'cover') pages.push(await coverPage(book, db, getPage));
         else if (s.type === 'title') pages.push(await textPage(book, 'title'));
         else {
           const p = await getPage(db, s.id);

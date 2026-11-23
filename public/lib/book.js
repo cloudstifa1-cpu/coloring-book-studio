@@ -1,10 +1,12 @@
 // Book builder: which pages, in what order, and the settings. Pure functions (testable).
+import { defaultCover, cleanCover } from './cover.js';
 
 export function defaultBook() {
   return {
     title: 'My Coloring Book', subtitle: '', author: '',
     size: 'letter', singleSided: true, frame: false, useColored: false,
     pageIds: [],
+    cover: defaultCover(),
   };
 }
 
@@ -49,7 +51,7 @@ export function buildSequence(book) {
 export function loadBook(storage = globalThis.localStorage) {
   try {
     const b = JSON.parse(storage.getItem('cbs-book'));
-    if (b && Array.isArray(b.pageIds)) return { ...defaultBook(), ...b };
+    if (b && Array.isArray(b.pageIds)) return { ...defaultBook(), ...b, cover: cleanCover(b.cover) };
   } catch {}
   return defaultBook();
 }

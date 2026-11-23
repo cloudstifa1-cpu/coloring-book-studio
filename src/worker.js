@@ -1,5 +1,6 @@
 // Cloudflare Worker: serves the app and talks to the drawing AI.
 // No API keys: uses Cloudflare's built-in AI binding (env.AI).
+import { buildCoverPrompt } from '../public/lib/cover.js';
 import { buildPrompt, clampDifficulty, cleanSeed, randomSeed, dayKey, DEFAULT_CAP } from '../public/lib/core.js';
 import { TEXT_MODEL, DEFAULT_CHAT_CAP, buildMessages, replyText } from '../public/lib/assistant.js';
 
@@ -67,7 +68,8 @@ export async function handleApi(request, env) {
     try { body = await request.json(); } catch { return json({ error: 'Bad request.' }, 400); }
 
     let prompt;
-    try { prompt = buildPrompt(body.subject, body.difficulty); }
+    // cover: true makes a full-color cover picture instead of a black and white page.
+    try { prompt = body.cover ? buildCoverPrompt(body.subject) : buildPrompt(body.subject, body.difficulty); }
     catch (e) { return json({ error: e.message }, 400); }
 
     const cap = capOf(env);
