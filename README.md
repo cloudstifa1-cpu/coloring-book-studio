@@ -15,6 +15,13 @@ The **AI Helper** tab chats with a small free text AI (`@cf/meta/llama-3.2-3b-in
 ## Offline Patterns (no internet needed)
 On the Make a Page tab: Mandala, Geometric, Stained Glass, Flower Garden, Zentangle Tiles and Kaleidoscope pages drawn with math right on the phone (no AI, no service needed, no daily limit). Uses the difficulty slider; each page has a seed. Pattern pages work with everything else: My Pages, line weight, PNG/PDF, tap-to-fill coloring, Book and Cover. The AI scene pages, AI cover picture and AI Helper still need internet. Open the app once online so it saves to the phone.
 
+## Models tab (offline AI models)
+Pick which AI makes pictures and which runs the AI Helper:
+- **Pictures:** Cloudflare AI (online), Offline Patterns, or a picture app found on the phone/network (Stable Diffusion WebUI with `--api --cors-allow-origins=*`, or LocalAI-style image models).
+- **AI Helper (and back cover words):** Cloudflare AI, a **.gguf model file already on the phone** (Pick a Model File: the app keeps a copy so it's there next time), a small model downloaded in the app (SmolLM2 360M 386 MB, Qwen 2.5 0.5B 398 MB, Llama 3.2 1B 808 MB), an AI app on the phone (Ollama with `OLLAMA_ORIGINS=*`, LM Studio, llama.cpp/LocalAI), or the browser's built-in AI when available.
+- **Search This Phone for Models** lists everything found. A browser can't look through a phone's files on its own, so model files are added once with the picker.
+- Offline models run in the browser with wllama (llama.cpp). Open the app once online so the engine (about 11 MB) is saved. Tested: SmolLM2 360M answered the AI Helper with the internet off.
+
 ## Cover Maker (Book tab)
 - 3 cover styles: Classic (white, double border), Banner (color page with title bar), Full picture.
 - Pick background and title colors (warns when the title is hard to read), and a cover picture: the first page, any book page, its colored version, or a **full-color AI cover picture** (uses 1 of the day's free pages).

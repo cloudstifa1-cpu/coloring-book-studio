@@ -5,6 +5,7 @@ import { COVER_STYLES, PAPER, coverLayout, placeImage, fitText, wrapSize, kdpWar
 import { buildSequence } from './lib/book.js';
 import { makePdf, PAGE_SIZES } from './lib/pdf.js';
 import { saveFile } from './lib/pagetools.js';
+import { askText } from './engines.js';
 
 const AI_KEY = 'cbs-cover-img';
 const FONT = "Georgia, 'Times New Roman', serif";
@@ -225,11 +226,8 @@ export function initCover({ $, db, getPage, getBook, save }) {
 
   $('cBlurbAi').onclick = () => run($('cBlurbAi'), async () => {
     msg('The AI Helper is writing your back cover…');
-    const r = await fetch('/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: blurbRequest(getBook()) }] }) })
-      .catch(() => { throw new Error('No connection. Try again.'); });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data.reply) throw new Error(data.error || 'The helper did not answer. Try again.');
+    const data = await askText([{ role: 'user', content: blurbRequest(getBook()) }])
+      .catch(e => { throw new Error(e instanceof TypeError ? 'No connection. Try again, or pick an offline model on the Models tab.' : e.message); });
     const text = cleanBlurb(data.reply);
     cover().blurb = text; $('cBlurb').value = text; save();
     msg('Back cover words ready. Change them any way you like.');

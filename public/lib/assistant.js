@@ -78,3 +78,22 @@ export function replyText(result) {
   if (c && c.message && typeof c.message.content === 'string') return c.message.content;
   return '';
 }
+
+// Small offline models often list ideas as bullets instead of IDEA lines.
+// Turns "* Gothic: a church with stained glass" lines into ideas (label dropped).
+const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+(?:\*\*)?(?:[^:*]{1,30}(?:\*\*)?:\s*(?:\*\*)?\s*)?(.+)$/;
+export function bulletIdeas(text) {
+  const seen = new Set(), out = [];
+  for (const line of String(text ?? '').split('\n')) {
+    const m = line.match(BULLET);
+    if (!m) continue;
+    const idea = clip(m[1].replace(/\*\*/g, '').replace(/^["']|["']$/g, ''), MAX_PROMPT);
+    if (idea.length < 12 || seen.has(idea.toLowerCase())) continue;
+    seen.add(idea.toLowerCase()); out.push(idea);
+    if (out.length >= MAX_IDEAS) break;
+  }
+  return out;
+}
+export function stripBullets(text) {
+  return String(text ?? '').split('\n').filter(l => !BULLET.test(l)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}

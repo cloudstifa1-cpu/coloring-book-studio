@@ -1,10 +1,13 @@
-import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, dayKey, DEFAULT_CAP } from './lib/core.js';
+import { THEMES, nextSubject, clampDifficulty, cleanSeed, randomSeed, randomPick, buildPrompt, dayKey, DEFAULT_CAP } from './lib/core.js';
 import { cleanBlob, sharpPng, pagePdf, saveFile } from './lib/pagetools.js';
 import { WEIGHTS, DEFAULT_WEIGHT, clampWeight, weightOf } from './lib/cleanup.js';
 import { initColorer } from './colorer.js';
 import { initBook } from './bookui.js';
 import { initHelper } from './helperui.js';
 import { PATTERNS, makePattern, drawShapes, patternRecord, SIZE } from './lib/patterns.js';
+import { loadChoice } from './lib/models.js';
+import { pictureWith } from './engines.js';
+import { initModels } from './modelsui.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -107,6 +110,17 @@ function pickTheme(name) {
 
 // Asks the AI for one page, cleans it, saves it. Returns the page or throws a message.
 async function makeOne(subject, difficulty) {
+  const pick = loadChoice().picture;
+  if (pick === 'patterns') return makePatternPage($('pType').value, difficulty);
+  if (pick !== 'cloud') {
+    const seed = randomSeed();
+    const original = await pictureWith(pick, buildPrompt(subject, difficulty), seed);
+    const blob = await cleanBlob(original, DEFAULT_WEIGHT);
+    const page = { id: makeId(), created: Date.now(), subject, theme: selectedTheme, difficulty, seed, source: 'offline-model',
+      favorite: false, original, blob, weight: DEFAULT_WEIGHT, thumb: await makeThumb(blob) };
+    await savePage(db, page);
+    return page;
+  }
   const r = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -324,6 +338,7 @@ function switchTab(name) {
   $('library').hidden = name !== 'library';
   $('book').hidden = name !== 'book';
   $('helper').hidden = name !== 'helper';
+  $('models').hidden = name !== 'models';
   if (name === 'library') renderLibrary();
   if (name === 'book') bookUi.render();
 }
@@ -335,6 +350,7 @@ async function start() {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
   $('difficulty').oninput = e => { $('diffLabel').textContent = e.target.value; };
   $('generate').onclick = generate;
+  initModels({ $ });
   $('pType').replaceChildren(new Option('Any pattern', 'any'), ...Object.entries(PATTERNS).map(([v, t]) => new Option(t, v)));
   $('pMake').onclick = () => makePatterns(1);
   $('pBatch').onclick = () => makePatterns(5);

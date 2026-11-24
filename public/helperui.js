@@ -1,5 +1,6 @@
 // AI Helper tab: chat with a small free AI for themes, book plans and better scene prompts.
-import { QUICK, cleanHistory, parseIdeas, stripIdeas } from './lib/assistant.js';
+import { QUICK, cleanHistory, parseIdeas, stripIdeas, bulletIdeas, stripBullets } from './lib/assistant.js';
+import { askText } from './engines.js';
 
 const STORE = 'cbs-helper-chat';
 
@@ -17,10 +18,12 @@ export function initHelper({ $, getContext, onUse, onBatch }) {
     const who = document.createElement('b');
     who.textContent = m.role === 'user' ? 'You' : 'Helper';
     const p = document.createElement('p');
-    p.textContent = m.role === 'assistant' ? (stripIdeas(m.content) || 'Here are some ideas:') : m.content;
+    let ideas = m.role === 'assistant' ? parseIdeas(m.content) : [];
+    const bullets = m.role === 'assistant' && !ideas.length ? bulletIdeas(m.content) : [];
+    if (bullets.length > 1) ideas = bullets;   // offline models: bullet list → idea buttons
+    p.textContent = m.role === 'assistant' ? ((bullets.length > 1 ? stripBullets(m.content) : stripIdeas(m.content)) || 'Here are some ideas:') : m.content;
     div.append(who, p);
     if (m.role === 'assistant') {
-      const ideas = parseIdeas(m.content);
       for (const idea of ideas) {
         const b = document.createElement('button');
         b.className = 'idea';
@@ -56,15 +59,9 @@ export function initHelper({ $, getContext, onUse, onBatch }) {
     render();
     status('Helper is thinking…');
     try {
-      const r = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ messages: history, ...getContext() }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !data.reply) throw new Error(data.error || 'The helper did not answer. Try again.');
+      const data = await askText(history, getContext());
       history.push({ role: 'assistant', content: data.reply });
-      status(data.source === 'pollinations' ? 'Answered by the free backup AI.' : '');
+      status(data.source === 'pollinations' ? 'Answered by the free backup AI.' : data.source === 'offline' ? 'Answered by your offline model.' : '');
     } catch (e) {
       history.pop();              // let them resend the same message
       $('hInput').value = text;

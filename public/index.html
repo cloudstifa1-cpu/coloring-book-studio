@@ -20,6 +20,7 @@
   <button class="tab" data-tab="library">My Pages</button>
   <button class="tab" data-tab="book">Book</button>
   <button class="tab" data-tab="helper">AI Helper</button>
+  <button class="tab" data-tab="models">Models</button>
 </nav>
 
 <main>
@@ -171,6 +172,29 @@
     <div id="bList"></div>
     <button id="bExport" class="big primary full">Make Book PDF</button>
     <p id="bStatus" class="status" role="status"></p>
+  </section>
+  <section id="models" class="panel" hidden>
+    <p class="info">Pick which AI makes your pages and which runs the AI Helper. Offline models keep working with no phone service.</p>
+    <label for="mPicture">Pictures made by</label>
+    <select id="mPicture"></select>
+    <label for="mText">AI Helper uses</label>
+    <select id="mText"></select>
+    <button id="mTest" class="big full">Test AI Helper Model</button>
+    <button id="mSearch" class="big primary full">Search This Phone for Models</button>
+    <p id="mStatus" class="status" role="status"></p>
+    <h2>Use a model file on this phone</h2>
+    <p class="info">Already downloaded a .gguf model (for example in your Downloads folder)? Pick it here. The app keeps a copy so it works offline.</p>
+    <input id="mFile" type="file" accept=".gguf" hidden>
+    <button id="mFileBtn" class="big full">Pick a Model File (.gguf)</button>
+    <h2>Download a small offline model</h2>
+    <p id="mPhone" class="info"></p>
+    <div id="mDownloads"></div>
+    <h2>AI apps on the phone or a computer</h2>
+    <p class="info">Search also finds Ollama, LM Studio, llama.cpp/LocalAI and Stable Diffusion WebUI running on this phone. They must allow browser connections (Ollama: OLLAMA_ORIGINS=*, Stable Diffusion WebUI: --api --cors-allow-origins=*). For one on another device, type its address.</p>
+    <label for="mAddress">Address (optional)</label>
+    <input id="mAddress" type="text" placeholder="192.168.1.20:11434">
+    <button id="mAddAddress" class="big full">Add Address and Search</button>
+    <p id="mCustomList" class="info"></p>
   </section>
   <section id="helper" class="panel" hidden>
     <p class="info">Ask for theme ideas, book plans, or better scene wording. Tap an idea to use it, or batch them all.</p>
