@@ -4,6 +4,7 @@ import { WEIGHTS, DEFAULT_WEIGHT, clampWeight, weightOf } from './lib/cleanup.js
 import { initColorer } from './colorer.js';
 import { initBook } from './bookui.js';
 import { initHelper } from './helperui.js';
+import { PATTERNS, makePattern, drawShapes, patternRecord, SIZE } from './lib/patterns.js';
 import { openDB, savePage, getPage, deletePage, listPages, filterPages, makeId } from './lib/db.js';
 
 const $ = id => document.getElementById(id);
@@ -110,7 +111,7 @@ async function makeOne(subject, difficulty) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ subject, difficulty, seed: randomSeed() }),
-  }).catch(() => { throw new Error('No connection to the drawing AI. Check your internet and try again.'); });
+  }).catch(() => { throw new Error('No connection to the drawing AI. Check your internet, or tap Make Pattern Page to make one offline.'); });
   if (!r.ok) {
     let msg = 'Something went wrong. Try again.';
     try { const e = await r.json(); msg = (e.error || msg) + (e.detail ? ` (Details: ${e.detail})` : ''); } catch {}
@@ -128,6 +129,39 @@ async function makeOne(subject, difficulty) {
   return page;
 }
 
+// Offline: draws a pattern page with math (no internet), cleans it, saves it.
+async function makePatternPage(type, difficulty) {
+  const p = makePattern(type, randomSeed(), difficulty);
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  drawShapes(c.getContext('2d'), p.shapes, 1, 3, p.clip);
+  const original = await new Promise(res => c.toBlob(res, 'image/png'));
+  c.width = c.height = 0;
+  if (!original) throw new Error('Could not draw the pattern. Try again.');
+  const blob = await cleanBlob(original, DEFAULT_WEIGHT);
+  const page = { id: makeId(), created: Date.now(), ...patternRecord(p), favorite: false, original, blob, weight: DEFAULT_WEIGHT, thumb: await makeThumb(blob) };
+  await savePage(db, page);
+  return page;
+}
+
+async function makePatterns(count) {
+  if (busy) return;
+  setBusy(true);
+  try {
+    let page;
+    for (let i = 1; i <= count; i++) {
+      setStatus(count > 1 ? `Drawing pattern ${i} of ${count}…` : 'Drawing pattern…');
+      page = await makePatternPage($('pType').value, clampDifficulty($('difficulty').value));
+    }
+    showResult(page);
+    setStatus(count > 1 ? `${count} patterns saved to My Pages (made offline).` : 'Saved to My Pages (made offline).');
+  } catch (e) {
+    setStatus(e.message || String(e), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
 function showResult(page) {
   current = page;
   $('addBook').textContent = 'Add to Book';
@@ -140,7 +174,7 @@ function showResult(page) {
 
 function setBusy(on) {
   busy = on;
-  $('generate').disabled = $('random').disabled = $('batch').disabled = on;
+  $('generate').disabled = $('random').disabled = $('batch').disabled = $('pMake').disabled = $('pBatch').disabled = on;
   $('stopBatch').hidden = !batchRunning;
 }
 
@@ -301,8 +335,11 @@ async function start() {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
   $('difficulty').oninput = e => { $('diffLabel').textContent = e.target.value; };
   $('generate').onclick = generate;
+  $('pType').replaceChildren(new Option('Any pattern', 'any'), ...Object.entries(PATTERNS).map(([v, t]) => new Option(t, v)));
+  $('pMake').onclick = () => makePatterns(1);
+  $('pBatch').onclick = () => makePatterns(5);
   $('random').onclick = randomize;
-  $('again').onclick = generate;
+  $('again').onclick = () => (current && current.source === 'offline' ? makePatterns(1) : generate());
   $('downloadPng').onclick = () => download(current, 'png');
   $('downloadPrint').onclick = () => download(current, 'print');
   $('downloadPdf').onclick = () => download(current, 'pdf');

@@ -12,6 +12,9 @@ Optional: connect a KV namespace with the binding name `USAGE` to have the Worke
 ## AI Helper
 The **AI Helper** tab chats with a small free text AI (`@cf/meta/llama-3.2-3b-instruct`) for theme ideas, book plans and better scene wording. Tap an idea to load it, or **Batch all** to send every idea to Make Batch. It uses the same free Workers AI daily allowance as the drawings. With `USAGE` KV connected, chat messages are capped separately (`CHAT_CAP`, default 200 a day). If Cloudflare's chat is capped, used up, or has a problem, the free Pollinations text AI answers instead (no key, no cost).
 
+## Offline Patterns (no internet needed)
+On the Make a Page tab: Mandala, Geometric, Stained Glass, Flower Garden, Zentangle Tiles and Kaleidoscope pages drawn with math right on the phone (no AI, no service needed, no daily limit). Uses the difficulty slider; each page has a seed. Pattern pages work with everything else: My Pages, line weight, PNG/PDF, tap-to-fill coloring, Book and Cover. The AI scene pages, AI cover picture and AI Helper still need internet. Open the app once online so it saves to the phone.
+
 ## Cover Maker (Book tab)
 - 3 cover styles: Classic (white, double border), Banner (color page with title bar), Full picture.
 - Pick background and title colors (warns when the title is hard to read), and a cover picture: the first page, any book page, its colored version, or a **full-color AI cover picture** (uses 1 of the day's free pages).
